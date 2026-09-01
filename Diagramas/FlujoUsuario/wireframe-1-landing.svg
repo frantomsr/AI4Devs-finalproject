@@ -1,0 +1,44 @@
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+  <rect width="800" height="500" fill="#ffffff" stroke="#999" stroke-width="1"/>
+  <!-- Header -->
+  <rect x="0" y="0" width="800" height="60" fill="#f2f2f2" stroke="#bbb"/>
+  <circle cx="40" cy="30" r="14" fill="#ccc"/>
+  <text x="65" y="35" font-size="14" fill="#555">CanvasCollab</text>
+  <rect x="560" y="15" width="90" height="30" rx="4" fill="#e0e0e0" stroke="#999"/>
+  <text x="580" y="34" font-size="12" fill="#555">Iniciar sesión</text>
+  <rect x="660" y="15" width="110" height="30" rx="4" fill="#444"/>
+  <text x="685" y="34" font-size="12" fill="#fff">Registrarse</text>
+
+  <!-- Hero -->
+  <text x="60" y="140" font-size="30" fill="#333">Colabora en tiempo real,</text>
+  <text x="60" y="175" font-size="30" fill="#333">sin fricción para tus invitados</text>
+  <line x1="60" y1="205" x2="480" y2="205" stroke="#bbb" stroke-width="2"/>
+  <line x1="60" y1="225" x2="420" y2="225" stroke="#bbb" stroke-width="2"/>
+
+  <rect x="60" y="255" width="180" height="42" rx="6" fill="#444"/>
+  <text x="90" y="281" font-size="14" fill="#fff">Crear cuenta gratis</text>
+
+  <!-- Hero image placeholder -->
+  <rect x="440" y="100" width="300" height="220" rx="8" fill="#fafafa" stroke="#bbb" stroke-dasharray="6,4"/>
+  <line x1="440" y1="100" x2="740" y2="320" stroke="#ccc" stroke-dasharray="6,4"/>
+  <line x1="740" y1="100" x2="440" y2="320" stroke="#ccc" stroke-dasharray="6,4"/>
+  <text x="530" y="215" font-size="12" fill="#aaa">[ vista previa del canvas ]</text>
+
+  <!-- Feature row -->
+  <g>
+    <rect x="60" y="360" width="200" height="100" rx="6" fill="#fafafa" stroke="#ddd"/>
+    <text x="80" y="385" font-size="12" fill="#666">Canvas en tiempo real</text>
+    <line x1="80" y1="400" x2="230" y2="400" stroke="#ddd"/>
+    <line x1="80" y1="415" x2="200" y2="415" stroke="#ddd"/>
+
+    <rect x="300" y="360" width="200" height="100" rx="6" fill="#fafafa" stroke="#ddd"/>
+    <text x="320" y="385" font-size="12" fill="#666">Invita por link, sin registro</text>
+    <line x1="320" y1="400" x2="470" y2="400" stroke="#ddd"/>
+    <line x1="320" y1="415" x2="440" y2="415" stroke="#ddd"/>
+
+    <rect x="540" y="360" width="200" height="100" rx="6" fill="#fafafa" stroke="#ddd"/>
+    <text x="560" y="385" font-size="12" fill="#666">ES · EN · DE · NL</text>
+    <line x1="560" y1="400" x2="710" y2="400" stroke="#ddd"/>
+    <line x1="560" y1="415" x2="680" y2="415" stroke="#ddd"/>
+  </g>
+</svg>

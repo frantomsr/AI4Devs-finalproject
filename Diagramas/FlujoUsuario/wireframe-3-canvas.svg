@@ -1,0 +1,37 @@
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+  <rect width="800" height="500" fill="#ffffff" stroke="#999" stroke-width="1"/>
+  <!-- Top bar -->
+  <rect x="0" y="0" width="800" height="50" fill="#f7f7f7" stroke="#ddd"/>
+  <text x="20" y="30" font-size="13" fill="#555">Taller UX — sesión en curso</text>
+  <circle cx="620" cy="25" r="10" fill="#c9c9c9"/>
+  <circle cx="645" cy="25" r="10" fill="#a9a9a9"/>
+  <circle cx="670" cy="25" r="10" fill="#8a8a8a"/>
+  <text x="620" y="45" font-size="9" fill="#999">3 activos</text>
+  <rect x="700" y="12" width="90" height="28" rx="5" fill="#444"/>
+  <text x="715" y="30" font-size="11" fill="#fff">Compartir</text>
+
+  <!-- Left toolbar -->
+  <rect x="0" y="50" width="50" height="450" fill="#fafafa" stroke="#eee"/>
+  <rect x="12" y="70" width="26" height="26" rx="4" fill="#eee" stroke="#ccc"/>
+  <rect x="12" y="106" width="26" height="26" rx="4" fill="#eee" stroke="#ccc"/>
+  <rect x="12" y="142" width="26" height="26" rx="4" fill="#eee" stroke="#ccc"/>
+  <rect x="12" y="178" width="26" height="26" rx="4" fill="#eee" stroke="#ccc"/>
+  <text x="16" y="88" font-size="12" fill="#888">▢</text>
+  <text x="16" y="124" font-size="12" fill="#888">◯</text>
+  <text x="16" y="160" font-size="12" fill="#888">T</text>
+  <text x="14" y="196" font-size="12" fill="#888">🖼</text>
+
+  <!-- Canvas area -->
+  <rect x="50" y="50" width="750" height="450" fill="#ffffff"/>
+  <rect x="120" y="110" width="160" height="100" rx="4" fill="#fdf3d0" stroke="#e0d090"/>
+  <text x="132" y="135" font-size="10" fill="#998">Idea 1: onboarding</text>
+  <rect x="330" y="180" width="180" height="120" rx="4" fill="#fafafa" stroke="#ccc" stroke-dasharray="5,3"/>
+  <line x1="330" y1="180" x2="510" y2="300" stroke="#ddd" stroke-dasharray="4,3"/>
+  <line x1="510" y1="180" x2="330" y2="300" stroke="#ddd" stroke-dasharray="4,3"/>
+  <text x="360" y="245" font-size="10" fill="#aaa">[imagen subida]</text>
+  <rect x="560" y="120" width="150" height="90" rx="4" fill="#eaf3ff" stroke="#a9c9e8"/>
+  <text x="572" y="145" font-size="10" fill="#5b83a8">Flujo invitado</text>
+  <!-- cursor labels -->
+  <text x="290" y="250" font-size="9" fill="#c9c9c9">● Ana</text>
+  <text x="600" y="230" font-size="9" fill="#a9a9a9">● Marc</text>
+</svg>

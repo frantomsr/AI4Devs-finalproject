@@ -1,0 +1,37 @@
+<svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+  <rect width="800" height="500" fill="#ffffff" stroke="#999" stroke-width="1"/>
+  <!-- Sidebar -->
+  <rect x="0" y="0" width="180" height="500" fill="#f7f7f7" stroke="#ddd"/>
+  <circle cx="30" cy="30" r="14" fill="#ccc"/>
+  <text x="55" y="35" font-size="13" fill="#555">CanvasCollab</text>
+  <rect x="20" y="70" width="140" height="30" rx="4" fill="#444"/>
+  <text x="35" y="90" font-size="12" fill="#fff">Mis sesiones</text>
+  <text x="35" y="130" font-size="12" fill="#888">Plantillas</text>
+  <text x="35" y="160" font-size="12" fill="#888">Ajustes</text>
+  <text x="35" y="190" font-size="12" fill="#888">Plan: Free</text>
+
+  <!-- Top bar -->
+  <rect x="180" y="0" width="620" height="60" fill="#fff" stroke="#eee"/>
+  <text x="200" y="35" font-size="18" fill="#333">Mis sesiones</text>
+  <rect x="640" y="15" width="140" height="32" rx="6" fill="#444"/>
+  <text x="660" y="36" font-size="12" fill="#fff">+ Nueva sesión</text>
+
+  <!-- Session cards -->
+  <g>
+    <rect x="200" y="90" width="180" height="120" rx="6" fill="#fafafa" stroke="#ddd"/>
+    <line x1="200" y1="90" x2="380" y2="210" stroke="#eee" stroke-dasharray="5,3"/>
+    <text x="212" y="180" font-size="11" fill="#666">Taller UX — 12 ago</text>
+    <text x="212" y="196" font-size="10" fill="#999">3 participantes</text>
+
+    <rect x="400" y="90" width="180" height="120" rx="6" fill="#fafafa" stroke="#ddd"/>
+    <line x1="400" y1="90" x2="580" y2="210" stroke="#eee" stroke-dasharray="5,3"/>
+    <text x="412" y="180" font-size="11" fill="#666">Sesión coaching — 20 ago</text>
+    <text x="412" y="196" font-size="10" fill="#999">2 participantes</text>
+
+    <rect x="600" y="90" width="180" height="120" rx="6" fill="#fafafa" stroke="#ddd" stroke-dasharray="4,3"/>
+    <text x="660" y="155" font-size="24" fill="#ccc">+</text>
+    <text x="622" y="185" font-size="11" fill="#aaa">Nueva sesión</text>
+  </g>
+
+  <text x="200" y="250" font-size="11" fill="#aaa">Historial anterior ↓</text>
+</svg>
