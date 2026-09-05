@@ -20,6 +20,9 @@ Antes de los diagramas, las decisiones tomadas y su motivo. Cada una se justific
 | ADR-06 | **Persistencia tras una interfaz `CanvasStore`** desde el primer día | Escribir contra la API desde los componentes | Es la pieza que hace barata la conversión a MVP-B: cambiar de implementación, no de aplicación |
 | ADR-07 | **Mobile-first real: el flujo del invitado se diseña y se valida primero en móvil** | Diseñar en desktop y adaptar | Muchos invitados abrirán el enlace desde el móvil durante una videollamada; es la ruta que decide la adopción |
 | ADR-08 | **Exportación PNG/PDF íntegramente en cliente** | Servicio headless de renderizado | Cero infraestructura, cero coste y ningún contenido del canvas sale del navegador |
+| ADR-09 | **En MVP-A el invitado recibe una render estática del canvas con zoom y desplazamiento**, no el motor de canvas | Cargar el SDK en modo solo lectura | El invitado solo mira. Servir una render vectorial hace la ruta crítica en móvil un orden de magnitud más ligera y elimina la dependencia del SDK en la página más expuesta del producto |
+| ADR-10 | **Caché por contenido, nunca por enlace.** La validación del token es siempre dinámica; lo cacheable es la render, direccionada por canvas y versión | Cachear en el borde la respuesta de `/s/[token]` | Una respuesta cacheada que dependa de un secreto revocable haría imposible cumplir la promesa de revocación inmediata |
+| ADR-11 | **Limitación de tasa en dos capas: cortafuegos de la plataforma por IP y contadores en Postgres por sesión** | Añadir Redis gestionado como cuarto proveedor | El middleware no tiene estado compartido, así que el contador debe vivir en algún sitio. Postgres ya se consulta en esas rutas y evita un proveedor más que auditar |
 
 ### Nota sobre la licencia (ADR-02)
 
@@ -91,7 +94,7 @@ graph TB
     end
 
     subgraph "Cliente invitado (mayoritariamente movil)"
-        UIG["Vista de solo lectura<br/>motor en modo readonly"]
+        UIG["Visor estatico<br/>render SVG del canvas<br/>+ zoom y desplazamiento<br/>sin SDK de canvas"]
     end
 
     subgraph "Vercel (region UE)"
@@ -127,6 +130,7 @@ Tres detalles que suelen malinterpretarse:
 - **El invitado no recibe ninguna credencial de Supabase**, ni siquiera la clave pública anónima. Su navegador solo habla con el CDN de Vercel y con `/api`.
 - **El anfitrión sí habla directamente con Supabase** para autenticación y lecturas, con RLS como barrera. Las escrituras pasan por `/api` porque ahí viven las validaciones de límites de plan.
 - **Las imágenes suben directas del navegador a Storage** con URL firmada. No atraviesan la función serverless, que tiene límite de tamaño de payload.
+- **El invitado no carga el motor de canvas** (ADR-09). Recibe una render vectorial que el anfitrión genera al guardar, con zoom y desplazamiento resueltos en el visor. El detalle está en §2.2.8.
 
 ### 2.1.4. Vista de contenedores — MVP-B
 
@@ -199,7 +203,8 @@ graph TB
 | **Escalado vertical de la base de datos.** Sin sharding ni réplicas de lectura | A la escala objetiva (500 usuarios) sobra de largo | El plan de Supabase se escala con un clic hasta órdenes de magnitud por encima |
 | **El BFF salta la RLS en el flujo de invitado.** La autorización de ese camino vive en código, no en la base de datos | Es lo que permite no almacenar nada del invitado | Módulo único, corto, con cobertura de tests del 100 % y revisión reforzada (§2.5) |
 | **Cloudflare como tercer proveedor en MVP-B**, con infraestructura propia que operar | Diez veces más barato y alineado con el modelo de negocio | Plantilla oficial, despliegue desde CI, y ruta de degradación a modo local probada |
-| **Arranque en frío de funciones serverless** en picos de baja actividad | Impacto de decenas de milisegundos, irrelevante frente al objetivo de 2,5 s de carga | La vista del invitado se cachea en el borde cuando el enlace es público y de solo lectura |
+| **Arranque en frío de funciones serverless** en picos de baja actividad | Impacto de decenas de milisegundos, irrelevante frente al objetivo de carga | La validación del enlace es una consulta indexada y una respuesta mínima; el peso real viaja desde caché (§2.4.4) |
+| **El invitado ve una render, no el documento vivo** (ADR-09) | En MVP-A no puede editar, así que no necesita el modelo de objetos. A cambio, la página más crítica del producto deja de depender del SDK | La render se regenera en cada guardado; en MVP-B los enlaces de edición sí cargan el motor |
 | **La marca de agua del motor de canvas durante la fase privada** (ADR-02) | Coste cero mientras no hay ingresos | Decisión explícita antes del lanzamiento comercial |
 | **Sin fusión automática offline de larga duración** en MVP-B | El modelo es rebase sobre servidor autoritativo, no CRDT | Copia local en IndexedDB y reconciliación al reconectar; se documenta como limitación conocida |
 
@@ -212,6 +217,8 @@ graph TB
 | Componente | Tecnología | Responsabilidad | Fase |
 |---|---|---|---|
 | Aplicación web | Next.js 15 (App Router), React 19, TypeScript estricto | Interfaz completa: landing, autenticación, panel, editor y vista de invitado | A |
+| Visor del invitado | SVG servido como imagen + librería ligera de zoom y desplazamiento | Muestra la render del canvas sin cargar el SDK. Es la ruta crítica del producto en móvil | A |
+| Generador de render | Exportación nativa del motor, ejecutada en el navegador del anfitrión | Produce la render vectorial y la miniatura al guardar | A |
 | Sistema de diseño responsive | Tailwind CSS + tokens propios | Layout adaptativo mobile-first, tipografía fluida, áreas táctiles | A |
 | Middleware de borde | Next.js Middleware (runtime edge) | Idioma, sesión, limitación de tasa y cabeceras de seguridad en cada petición | A |
 | BFF | Route Handlers de Next.js | Única puerta de entrada del flujo anónimo; validación, autorización y límites de plan | A |
@@ -248,8 +255,8 @@ El diseño responsive no es una hoja de estilos: es una decisión de arquitectur
 - **Unidades de viewport dinámicas** (`dvh` en lugar de `vh`) para que la barra del navegador móvil no recorte el canvas al aparecer y desaparecer.
 - **Gestos táctiles nativos del motor**: pellizcar para zoom y arrastrar con el dedo funcionan sin desarrollo adicional, pero requieren desactivar el zoom del navegador sobre el lienzo (`touch-action: none` solo en el área del canvas, nunca en el documento entero, porque eso rompería la accesibilidad del resto de la interfaz).
 - **Sin *hover* como único mecanismo**: toda acción disponible al pasar el ratón tiene un equivalente por pulsación.
-- **Presupuesto de rendimiento para la vista de invitado**: menos de 200 KB de JavaScript en la carga inicial y primer render útil por debajo de 2,5 s en 4G en un móvil de gama media. Es la ruta que decide la adopción del producto, y se mide en cada release.
-- **Carga diferida del motor de canvas**: se importa dinámicamente, de modo que la landing y el panel no arrastran su peso.
+- **Presupuesto de rendimiento para la vista de invitado**, expresado en experiencia y no solo en kilobytes, medido en 4G sobre un móvil de gama media: LCP por debajo de 2,5 s, interactividad por debajo de 3,5 s y menos de 150 KB de JavaScript comprimido. Este último número solo es alcanzable porque el invitado no carga el motor de canvas (ADR-09); con el SDK en la página sería un orden de magnitud mayor. Es la ruta que decide la adopción del producto y se mide en cada release.
+- **Carga diferida del motor de canvas**: se importa dinámicamente y solo en las pantallas que editan. La landing, el panel y la vista de invitado de MVP-A no lo cargan en absoluto.
 - **Orientación**: el editor funciona en vertical y en horizontal; al rotar, el canvas conserva el encuadre y el zoom.
 - **Accesibilidad como parte del mismo trabajo**: contraste AA, foco visible, navegación por teclado en toda la interfaz salvo el lienzo, y respeto a `prefers-reduced-motion`.
 
@@ -259,12 +266,14 @@ El diseño responsive no es una hoja de estilos: es una decisión de arquitectur
 |---|---|
 | Flujos completos en tres viewports | Playwright con 390 × 844, 820 × 1180 y 1440 × 900 |
 | Eventos táctiles reales, no clics simulados | Playwright con `hasTouch: true` |
-| Presupuesto de peso de la vista de invitado | Fallo del build si se supera |
+| Presupuesto de rendimiento de la vista de invitado | Lighthouse en CI con red y CPU limitadas; el build falla si se superan LCP, interactividad o peso de JavaScript |
 | Dispositivos físicos | Manual antes de cada beta, sobre al menos un Android de gama media y un iPhone. El emulador no reproduce ni la latencia táctil ni el comportamiento de la barra del navegador |
 
 ### 2.2.3. Middleware de borde
 
-Se ejecuta antes que cualquier página o endpoint y concentra cuatro responsabilidades transversales: resolución de idioma (cookie, parámetro explícito, `Accept-Language`), refresco de la sesión del anfitrión, limitación de tasa por IP y por sesión, e inyección de las cabeceras de seguridad. Ponerlo aquí garantiza que ninguna ruta pueda olvidarse de ellas.
+Se ejecuta antes que cualquier página o endpoint y concentra tres responsabilidades transversales: resolución de idioma (cookie, parámetro explícito, `Accept-Language`), refresco de la sesión del anfitrión e inyección de las cabeceras de seguridad. Ponerlo aquí garantiza que ninguna ruta pueda olvidarse de ellas.
+
+Lo que **no** hace es limitar la tasa. El middleware se ejecuta en instancias efímeras y sin estado compartido, de modo que un contador mantenido en su memoria no cuenta nada útil. Esa responsabilidad se reparte entre el cortafuegos de la plataforma y la base de datos, como se describe en §2.5.5.
 
 ### 2.2.4. BFF (Route Handlers)
 
@@ -322,6 +331,58 @@ Comportamientos obligatorios que deben tener test automatizado:
 | Se supera el límite de participantes del plan | Conexión rechazada con mensaje traducido |
 | Reinicio del Durable Object | Rehidratación desde su storage; si está vacío, desde el snapshot de Postgres |
 | El servicio de sincronización no está disponible | La aplicación degrada a modo local con guardado HTTP y avisa al usuario |
+
+---
+
+### 2.2.8. Visor del invitado y generación de la render
+
+En MVP-A el invitado abre el enlace para mirar, no para editar. Cargar un SDK de canvas completo para eso penaliza justo la página que decide si el producto se adopta, y en el dispositivo peor: un móvil, con red de datos, en mitad de una videollamada.
+
+**Qué recibe el invitado.** Una render vectorial del canvas en SVG, servida como imagen, con zoom y desplazamiento resueltos por una librería ligera. El SVG conserva la nitidez del texto y de las figuras a cualquier nivel de zoom, que es lo que hace viable sustituir al motor sin degradar la experiencia.
+
+**Cuándo se genera.** El navegador del anfitrión ya tiene el documento cargado y el motor sabe exportarlo, así que la render se produce en cliente en el mismo ciclo que el guardado: al confirmarse una escritura, y con un retardo adicional para no exportar en cada trazo. Se sube a Storage por URL firmada, igual que cualquier otro fichero. No hay renderizado en servidor, ni navegador headless, ni coste de infraestructura.
+
+**Fallback a mapa de bits.** Si el SVG exportado supera un umbral de tamaño —canvases con muchas imágenes incrustadas o miles de figuras— se genera además un PNG de alta resolución y el visor sirve ese. Se pierde nitidez al ampliar mucho, pero se evita entregar un fichero de varios megabytes a un móvil.
+
+**Consistencia.** La render es siempre la del último guardado confirmado, que es exactamente lo que el documento de producto promete al invitado en MVP-A: la última versión guardada, no el estado vivo del anfitrión.
+
+**Qué cambia en MVP-B.** Los enlaces de solo lectura siguen sirviendo la render, que es más rápida y más barata. Los enlaces de edición sí cargan el motor y se conectan a la sala, porque ahí el invitado necesita el modelo de objetos.
+
+**Impacto en el modelo de datos.** Requiere dos columnas nuevas en la entidad de canvas: la ruta de la render y su marca de generación. Esta última es la que permite la caché inmutable descrita en §2.4.4.
+
+---
+
+### 2.2.9. Calidad del código y herramientas del frontend
+
+ESLint con configuración plana y Prettier, pese a que existen alternativas más rápidas: los plugins que este proyecto necesita —accesibilidad, fronteras de importación, detección de texto sin traducir— solo viven en ese ecosistema.
+
+La función del linter aquí no es de estilo, es de arquitectura. Las tres reglas estructurales de §2.3 dejan de ser prosa y pasan a ser restricciones de importación por zonas. Los paquetes `server-only` y `client-only` marcan los módulos que no pueden cruzar la frontera, de modo que un import equivocado rompe el build en lugar de filtrar código de servidor al navegador. Las reglas que usan información de tipos —promesas sin esperar, promesas mal usadas— atrapan la clase de fallo más frecuente en código asistido por IA: una escritura sin `await` que aparenta funcionar.
+
+Se prohíben los literales de texto en JSX dentro de `app/` y `components/`, que es la única forma de que la internacionalización no se degrade sola. Todo se configura como error y nunca como aviso, porque los avisos no los lee nadie, y se ejecuta antes del commit y no solo en integración continua.
+
+### 2.2.10. Estrategia de carga y estados de vista
+
+El presupuesto de rendimiento de §2.2.2 dice adónde hay que llegar; esta sección dice cómo.
+
+Toda vista implementa cinco estados antes de considerarse terminada: cargando, vacía, con error, sin conexión y sin permiso. Ninguno es opcional, y es la regla que con más frecuencia se omite cuando se desarrolla deprisa. El App Router los soporta de forma nativa con `loading.tsx` y `error.tsx` por segmento, de modo que la respuesta llega por partes en lugar de esperar a la consulta más lenta.
+
+Los esqueletos de carga reservan el espacio definitivo del contenido, para que no haya saltos de layout. Las imágenes declaran dimensiones y la render del invitado se marca como prioritaria, porque es el elemento que define su métrica de carga. Las fuentes se sirven locales y con subconjunto de caracteres, lo que además elimina una petición a un tercero en la ruta crítica. Las métricas reales de experiencia se envían a la telemetría, no se estiman.
+
+### 2.2.11. Internacionalización
+
+El mecanismo es `next-intl` con prefijo de idioma en la ruta. Lo que hace que no se degrade con el tiempo es lo demás.
+
+Los mensajes usan formato ICU, con plurales y variables declarados. Concatenar cadenas queda prohibido: el orden de los elementos cambia entre idiomas y la concatenación lo fija. Fechas, números y horas pasan siempre por el formateador de la locale, incluida la zona horaria, porque en sesiones entre países una hora sin zona es un error de producto y no de traducción.
+
+En integración continua se genera una pseudo-locale que alarga las cadenas y las acentúa, y las pruebas visuales se ejecutan contra ella. El alemán y el neerlandés son sensiblemente más largos que el español, y sin esta comprobación los desbordes se descubren cuando ya hay usuarios. Una clave ausente falla de forma ruidosa en desarrollo y retrocede al español en producción emitiendo un evento. Al cliente solo viaja el catálogo del idioma activo. El texto de interfaz y el contenido del usuario están separados: el segundo no se traduce nunca.
+
+### 2.2.12. Estado, formularios y accesibilidad
+
+Una regla de estado explícita evita que aparezca un almacén global en la tercera semana: la URL guarda lo que debe poder compartirse y volver atrás, el servidor guarda los datos, y el estado de cliente queda para lo efímero.
+
+Los formularios comparten el mismo esquema de validación entre cliente y servidor. En el cliente es experiencia de usuario; en el servidor es seguridad. Duplicarlos garantiza que diverjan.
+
+La accesibilidad se verifica automáticamente en las pruebas de extremo a extremo. Un punto propio de este producto: como el invitado recibe una imagen y no un documento, necesita alternativa textual y una vía de descarga para quien use lector de pantalla; sin eso, la vista más importante del producto es inaccesible por diseño.
 
 ---
 
@@ -499,7 +560,23 @@ flowchart LR
 4. **Nada se cambia a mano en las consolas de los proveedores**, salvo secretos. Si hace falta tocar algo, se hace por migración o por configuración versionada.
 5. **Rollback en un solo paso.** La vuelta atrás del frontend es instantánea; si una migración hubiera roto la compatibilidad, la regla 1 la habría impedido.
 
-### 2.4.4. Continuidad
+### 2.4.4. Estrategia de caché
+
+La regla de fondo es que **se cachea el contenido, nunca el permiso** (ADR-10). Una respuesta cacheada en el borde sobrevive a la revocación del enlace que la autorizó, así que ninguna respuesta cuya validez dependa de un secreto revocable puede ser cacheable.
+
+| Recurso | Caché | Clave | Motivo |
+|---|---|---|---|
+| `/s/[token]` (documento HTML) | `private, no-store` | — | Su validez depende del estado del enlace, que puede cambiar en cualquier momento |
+| Render del canvas | Inmutable, un año | Canvas y marca de generación | Cada versión es un recurso distinto; al regenerarse cambia la URL |
+| Imágenes del canvas | URL firmada con caducidad de una hora | Ruta del fichero | Acota la ventana de acceso tras una revocación |
+| Assets estáticos de la aplicación | Inmutable, un año | Hash del build | Comportamiento estándar del framework |
+| Respuestas de `/api` | Sin caché | — | Todas dependen de identidad o de estado |
+
+El flujo del invitado queda así: una respuesta dinámica, pequeña y rápida que valida el enlace y decide si deja pasar, seguida de la render pesada servida desde caché. Se conserva la velocidad donde está el peso, sin ceder la garantía de revocación.
+
+Cuando el anfitrión revoca un enlace, la siguiente petición del invitado falla en la validación dinámica, independientemente de lo que haya en cualquier caché intermedia. Las imágenes ya firmadas siguen siendo accesibles hasta que caduque su firma, y esa ventana de una hora es una limitación conocida que debe comunicarse al anfitrión: revocar corta el acceso al canvas de inmediato, pero una imagen concreta ya descargada no se puede recuperar.
+
+### 2.4.5. Continuidad
 
 | Aspecto | Medida |
 |---|---|
@@ -567,6 +644,7 @@ Reglas que sostienen este modelo:
 5. **El token nunca aparece en logs, ni en Sentry, ni en la telemetría.** Se filtra explícitamente en la configuración del cliente de errores, porque la URL completa se envía por defecto y eso filtraría el secreto a un tercero.
 6. **La revocación combina tres mecanismos**, porque un JWT firmado no se puede desfirmar: marca en base de datos, expulsión activa de la sala en MVP-B, y expiración corta con revalidación contra la base de datos en cada renovación.
 7. **Las páginas de invitado se sirven con `noindex`** y el `Referrer-Policy` impide que el token se filtre a terceros al hacer clic en un enlace externo.
+8. **Ninguna respuesta cuya validez dependa del enlace es cacheable.** La validación es siempre dinámica; lo que se cachea es la render, direccionada por contenido y no por token (§2.4.4). Sin esta regla, la promesa de revocación inmediata sería falsa.
 
 Matriz de permisos efectiva:
 
@@ -588,6 +666,7 @@ Matriz de permisos efectiva:
 | XSS almacenado en el canvas | El contenido del canvas se renderiza como datos del motor, nunca como HTML. El texto del usuario no se inyecta sin escapar en ningún componente |
 | XSS por SVG subido | Los SVG se sanean en servidor antes de aceptarse: se eliminan `script`, `foreignObject`, manejadores de eventos y referencias externas. Si el saneado altera el fichero de forma significativa, se rechaza |
 | Ficheros maliciosos | Lista blanca de tipos (`png`, `jpeg`, `webp`, `svg`), verificación del tipo real por contenido y no por extensión, y máximo de 10 MB |
+| XSS por la render servida al invitado | La render es un SVG generado a partir del documento, pero contiene texto del usuario. Se sirve siempre como imagen desde su propia ruta de almacenamiento, nunca insertada en línea en el DOM, de modo que ningún script que lograra colarse en ella podría ejecutarse en el origen de la aplicación |
 | Payloads desmesurados | Límite de tamaño en el cuerpo de las peticiones y límite de número de objetos por canvas |
 | Datos malformados | Validación con Zod en el límite de cada endpoint. Lo que no valida, no entra |
 | Falsificación de peticiones entre sitios | Cookies `SameSite=Lax` y verificación de origen en las mutaciones |
@@ -608,16 +687,29 @@ Aplicadas de forma centralizada en el middleware:
 
 ### 2.5.5. Limitación de tasa y abuso
 
-| Superficie | Límite |
-|---|---|
-| Apertura de enlace de invitado | 30 por minuto y por IP |
-| Autenticación | 5 por minuto y por IP |
-| Emisión de token de sala (MVP-B) | 10 por minuto y por sesión |
-| Solicitud de URL de subida | 20 por hora y por sesión |
-| Guardado del canvas | 60 por minuto y por usuario |
-| Creación de canvases y de enlaces | Sujeta además a las cuotas del plan |
+La limitación se aplica en dos capas, porque protegen de cosas distintas y no pueden vivir en el mismo sitio (ADR-11).
 
-Las cuotas de plan se comprueban **siempre en servidor**. La interfaz decide si muestra un botón o un aviso de mejora de plan, pero nunca es la barrera.
+**Capa 1 — cortafuegos de la plataforma, por IP, en el borde.** Reglas declaradas como configuración versionada, evaluadas antes de que la petición consuma cómputo. Protege de fuerza bruta contra la autenticación y de barridos de tokens de enlace, que son ataques de volumen y anónimos.
+
+**Capa 2 — contadores en Postgres, por sesión o por usuario.** Una tabla de ventanas deslizantes con incremento atómico, consultada en los mismos endpoints que ya acceden a la base de datos, de modo que no añade un viaje de red adicional. Protege de abuso por parte de alguien ya identificado, que la capa 1 no puede distinguir de un usuario legítimo tras la misma IP corporativa.
+
+| Superficie | Límite | Capa |
+|---|---|---|
+| Autenticación | 5 por minuto y por IP | 1 |
+| Apertura de enlace de invitado | 30 por minuto y por IP | 1 |
+| Peticiones totales a `/api` | 300 por minuto y por IP | 1 |
+| Emisión de token de sala (MVP-B) | 10 por minuto y por sesión | 2 |
+| Solicitud de URL de subida | 20 por hora y por sesión | 2 |
+| Guardado del canvas | 60 por minuto y por usuario | 2 |
+| Creación de canvases y de enlaces | Sujeta además a las cuotas del plan | 2 |
+
+**Comportamiento al superar el límite.** Respuesta `429` con cabecera `Retry-After` y un mensaje traducido al idioma de la petición. Nunca se revela cuál de los dos límites se ha alcanzado ni cuánto consumo queda, porque eso ayudaría a calibrar un ataque. Cada rechazo se registra como evento de seguridad, lo que permite detectar un barrido de tokens antes de que tenga éxito.
+
+**Limpieza.** Los contadores caducados se purgan con el mismo trabajo programado que aplica las políticas de retención. Sin esa purga, la tabla crece indefinidamente.
+
+**Impacto en el modelo de datos.** La capa 2 requiere una tabla de contadores con clave compuesta por sujeto, superficie y ventana temporal.
+
+Las cuotas de plan son un mecanismo distinto y complementario: se comprueban **siempre en servidor**, y además en la propia base de datos como segunda barrera. La interfaz decide si muestra un botón o un aviso de mejora de plan, pero nunca es la barrera.
 
 ### 2.5.6. Gestión de secretos y dependencias
 
@@ -668,6 +760,16 @@ Las cuotas de plan se comprueban **siempre en servidor**. La interfaz decide si 
 **Procedimiento ante incidente:** detección por alerta o aviso, contención (revocar claves, deshabilitar la superficie afectada, revertir despliegue), evaluación del alcance sobre datos personales, comunicación a los afectados, notificación a la autoridad de control dentro de las 72 horas si procede, y análisis posterior escrito. Los contactos y las plantillas de comunicación en los cuatro idiomas se preparan antes del lanzamiento, no durante el incidente.
 
 **Gate obligatorio antes de cada despliegue a producción:** checklist OWASP, checklist GDPR y prueba en dispositivos físicos. Los tres son bloqueantes y ninguno se puede saltar por prisa de lanzamiento, que es precisamente el riesgo identificado en el documento 1.
+
+### 2.5.10. OWASP aplicado al frontend
+
+El Top 10 de §2.5.8 está formulado para servidor. Su traducción al cliente añade riesgos que no se ven desde allí.
+
+El más sutil es de control de acceso: las propiedades que un componente de servidor entrega a uno de cliente viajan serializadas al navegador. Pasar el objeto completo del canvas cuando solo se necesita el título es una fuga silenciosa que ninguna revisión de la API detecta. La regla es entregar el mínimo campo necesario, y ocultar un control en la interfaz nunca cuenta como autorización.
+
+El optimizador de imágenes es un proxy: con una lista de dominios remotos amplia se convierte en un proxy abierto a costa de la factura propia. Se restringe a los orígenes propios.
+
+`dangerouslySetInnerHTML` queda prohibido sin excepción documentada. Ningún token vive en almacenamiento del navegador. Los enlaces externos llevan `rel="noopener noreferrer"`, porque la URL con el token de invitado viaja en la cabecera de referencia. La vista del invitado no carga scripts de terceros. Los mapas de fuentes no se publican en producción. Y la política de contenido con nonce se verifica en las pruebas, no solo se declara aquí.
 
 ---
 

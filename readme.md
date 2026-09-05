@@ -53,28 +53,39 @@ https://github.com/frantomsr/AI4Devs-finalproject.git
 ## 2. Arquitectura del Sistema
 
 ### **2.1. Diagrama de arquitectura:**
-> Usa el formato que consideres más adecuado para representar los componentes principales de la aplicación y las tecnologías utilizadas. Explica si sigue algún patrón predefinido, justifica por qué se ha elegido esta arquitectura, y destaca los beneficios principales que aportan al proyecto y justifican su uso, así como sacrificios o déficits que implica.
+El sistema combina tres patrones: monolito modular sobre Jamstack (Next.js en Vercel), Backend for Frontend para aislar al invitado de Supabase, y puertos y adaptadores aplicados solo al motor de canvas y a la persistencia. Se documentan vistas de contexto y de contenedores para MVP-A (canvas individual, invitado recibe una render estática) y MVP-B (colaboración en tiempo real vía Cloudflare Workers + Durable Objects). Se justifican los beneficios (coste bajo, superficie de ataque pequeña, reversibilidad) y los sacrificios asumidos (dependencia de Supabase, RLS saltada en el flujo de invitado, sin fusión offline en MVP-B).
 
+**Documentación completa:** [2-arquitectura-del-sistema.md](2-arquitectura-del-sistema.md)
 
 ### **2.2. Descripción de componentes principales:**
 
-> Describe los componentes más importantes, incluyendo la tecnología utilizada
+Enumera los componentes técnicos del sistema: aplicación Next.js/React, visor del invitado sin SDK de canvas, adaptadores `CanvasEngine` y `CanvasStore`, middleware de borde, BFF con Route Handlers, identidad dual (Supabase Auth para el anfitrión, JWT propio para el invitado), Postgres con RLS, Storage y el servidor de sincronización en Cloudflare (MVP-B). Detalla también la estrategia responsive mobile-first, la internacionalización con `next-intl` y la generación de la render que se sirve al invitado.
+
+**Documentación completa:** [2-arquitectura-del-sistema.md](2-arquitectura-del-sistema.md)
 
 ### **2.3. Descripción de alto nivel del proyecto y estructura de ficheros**
 
-> Representa la estructura del proyecto y explica brevemente el propósito de las carpetas principales, así como si obedece a algún patrón o arquitectura específica.
+Monorepo único que combina la aplicación web (App Router de Next.js) y el Worker de sincronización. La carpeta `lib/canvas/` concentra el núcleo hexagonal (interfaces de motor y persistencia), `lib/auth/` separa las dos identidades del sistema y `lib/db/` aísla la credencial privilegiada usada por el invitado. Tres reglas de linter, verificadas en CI, impiden que el SDK del motor, la credencial privilegiada o el acceso directo a datos se importen fuera de sus módulos designados.
+
+**Documentación completa:** [2-arquitectura-del-sistema.md](2-arquitectura-del-sistema.md)
 
 ### **2.4. Infraestructura y despliegue**
 
-> Detalla la infraestructura del proyecto, incluyendo un diagrama en el formato que creas conveniente, y explica el proceso de despliegue que se sigue
+Infraestructura en Vercel (funciones en Frankfurt), Supabase (Frankfurt) y, en MVP-B, Cloudflare con jurisdicción UE, manteniendo todo el tratamiento de datos dentro del EEE. El despliegue sigue un pipeline con CI bloqueante (lint, tests unitarios, autorización, e2e responsive, presupuesto de rendimiento, i18n, auditoría de seguridad) y un gate manual de checklist OWASP/GDPR antes de producción. La caché se rige por la regla de cachear contenido, nunca permiso, para no comprometer la revocación inmediata de enlaces.
+
+**Documentación completa:** [2-arquitectura-del-sistema.md](2-arquitectura-del-sistema.md)
 
 ### **2.5. Seguridad**
 
-> Enumera y describe las prácticas de seguridad principales que se han implementado en el proyecto, añadiendo ejemplos si procede
+Dos modelos de amenaza separados: el anfitrión (autenticado, protegido por Row Level Security en Postgres) y el invitado (acceso público mediante un secreto de 122 bits en la URL, sin dato persistente). La autorización, validación de entrada, cabeceras de seguridad y limitación de tasa en dos capas (IP en el borde, sesión en Postgres) cubren el Top 10 de OWASP. Se documentan además la gestión de secretos, la privacidad del invitado y el procedimiento ante incidentes.
+
+**Documentación completa:** [2-arquitectura-del-sistema.md](2-arquitectura-del-sistema.md)
 
 ### **2.6. Tests**
 
-> Describe brevemente algunos de los tests realizados
+La integración continua ejecuta jobs bloqueantes: `test:unit` (cuotas, firma de tokens, saneado), `test:authz` (aislamiento entre usuarios y alcance del token de invitado), `test:e2e` y `test:e2e:responsive` (flujos completos en móvil, tablet y desktop con eventos táctiles reales), `perf:budget` (presupuesto de rendimiento de la vista de invitado) e `i18n:check` (paridad de idiomas). Ningún job es opcional y todos fallan el build ante una regresión.
+
+**Documentación completa:** [2-arquitectura-del-sistema.md](2-arquitectura-del-sistema.md)
 
 ---
 
@@ -82,18 +93,23 @@ https://github.com/frantomsr/AI4Devs-finalproject.git
 
 ### **3.1. Diagrama del modelo de datos:**
 
-> Recomendamos usar mermaid para el modelo de datos, y utilizar todos los parámetros que permite la sintaxis para dar el máximo detalle, por ejemplo las claves primarias y foráneas.
+Diagrama entidad-relación en mermaid sobre PostgreSQL (Supabase, Frankfurt) con RLS activa en todas las tablas. El modelo se rige por seis principios: no se almacena ningún dato del invitado, la propiedad de un canvas es inmutable, el snapshot editable vive separado de los metadatos de lectura frecuente, las cuotas son datos y no código, toda tabla con datos personales declara su retención, y las claves primarias son UUID opacos.
 
+**Documentación completa:** [3-modelo-de-datos.md](3-modelo-de-datos.md)
 
 ### **3.2. Descripción de entidades principales:**
 
-> Recuerda incluir el máximo detalle de cada entidad, como el nombre y tipo de cada atributo, descripción breve si procede, claves primarias y foráneas, relaciones y tipo de relación, restricciones (unique, not null…), etc.
+Diez entidades: `plan_limits` (cuotas por plan), `profiles` (anfitrión registrado), `usage_counters` (consumo mensual), `canvases` y `canvas_documents` (metadatos y snapshot, separados por patrón de escritura), `share_links` (enlace de invitado con token UUID), `canvas_assets` (imágenes), `canvas_views` (visitas seudonimizadas), `security_events` y `rate_limit_counters`. Cada una detalla tipo, restricciones (`NOT NULL`, `CHECK`, `UNIQUE`), claves foráneas y su comportamiento en cascada o anulación.
+
+**Documentación completa:** [3-modelo-de-datos.md](3-modelo-de-datos.md)
 
 ---
 
 ## 4. Especificación de la API
 
-> Si tu backend se comunica a través de API, describe los endpoints principales (máximo 3) en formato OpenAPI. Opcionalmente puedes añadir un ejemplo de petición y de respuesta para mayor claridad
+API interna con patrón Backend for Frontend (Route Handlers de Next.js bajo `/api`), sin garantía de compatibilidad externa y con doble esquema de identidad: cookie de sesión del anfitrión y cookie de sesión efímera del invitado, ambas `HttpOnly`. Especificada en OpenAPI 3.1, cubre endpoints de cuenta, canvases, documento, compartición, invitado, ficheros y tiempo real, con formato de error uniforme, rate limiting y paginación por cursor. Autenticación, subida de ficheros y sincronización en tiempo real quedan deliberadamente fuera de esta API y se resuelven por SDK de Supabase, URL firmada y WebSocket respectivamente.
+
+**Documentación completa:** [4-especificaciones-de-la-api.md](4-especificaciones-de-la-api.md)
 
 ---
 
