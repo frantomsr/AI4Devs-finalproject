@@ -118,11 +118,25 @@ API interna con patrón Backend for Frontend (Route Handlers de Next.js bajo `/a
 > Documenta 3 de las historias de usuario principales utilizadas durante el desarrollo, teniendo en cuenta las buenas prácticas de producto al respecto.
 
 **Historia de Usuario 1**
-
+HU-01 Story: Como visitante, quiero registrarme con email y contraseña, para poder crear y gestionar mis propios canvases
+- Épica: Autenticación
+- Fase: MVP-A
+- Prioridad: Must
+- Tamaño estimado: S
 **Historia de Usuario 2**
-
+HU-02 Story: Como visitante, quiero registrarme/iniciar sesión con Google, para no tener que recordar otra contraseña
+- Épica: Autenticación
+- Fase: MVP-A
+- Prioridad: Should
+- Tamaño estimado: S
 **Historia de Usuario 3**
+HU-04 Story: Como anfitrión, quiero crear un canvas nuevo con formas, texto e imágenes, para organizar visualmente el contenido de mi sesión
+- Épica: Canvas
+- Fase: MVP-A
+- Prioridad: Must
+- Tamaño estimado: M
 
+Documentación completa: 5-historias-de-usuario.md
 ---
 
 ## 6. Tickets de Trabajo
@@ -130,17 +144,38 @@ API interna con patrón Backend for Frontend (Route Handlers de Next.js bajo `/a
 > Documenta 3 de los tickets de trabajo principales del desarrollo, uno de backend, uno de frontend, y uno de bases de datos. Da todo el detalle requerido para desarrollar la tarea de inicio a fin teniendo en cuenta las buenas prácticas al respecto. 
 
 **Ticket 1**
-
+T-00-1 Tarea: Redactar los prompts de First Draft
+- Historia asociada: HU-00
+- Tipo: Diseño
+- Estimación: 2
+- Prioridad: Must
+- Estado: Por hacer
+- Dependencias: —
 **Ticket 2**
-
+T-00-2 Tarea: Generar bocetos con Figma First Draft (desktop)
+- Historia asociada: HU-00
+- Tipo: Diseño
+- Estimación: 3
+- Prioridad: Must
+- Estado: Por hacer
+- Dependencias: T-00-1
 **Ticket 3**
+T-00-3 Tarea: Adaptar los bocetos a tablet y móvil
+- Historia asociada: HU-00
+- Tipo: Diseño
+- Estimación: 3
+- Prioridad: Must
+- Estado: Por hacer
+- Dependencias: T-00-2
 
+Documentacion completa: 6-tickets-de-trabajo.md
 ---
 
 ## 7. Pull Requests
 
 > Documenta 3 de las Pull Requests realizadas durante la ejecución del proyecto
-
+Este documento se completará una vez que se inicien los desarrollos y se generen los primeros pull requests del proyecto.
+La plantilla de PR esta en 7-pull-requests.md
 **Pull Request 1**
 
 **Pull Request 2**
